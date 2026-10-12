@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 运行时产物
+uploads/
+outputs/
+*.log
+
+# 大文件模型权重（按需纳入交付，默认忽略）
+models/*.pt
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store
