@@ -74,27 +74,174 @@ luzhibei/
 └─ README.md
 ```
 
-## 5. 数据流
+## 5. 系统架构与数据流
 
-### 5.1 图片检测
+### 5.1 架构图
+
+```mermaid
+graph TB
+  subgraph B["浏览器 / 前端 static"]
+    UI["index.html + style.css<br/>布局与样式"]
+    JS["app.js<br/>模式切换 · 上传 · 轮询 · 渲染"]
+  end
+
+  subgraph S["FastAPI 应用 app"]
+    MAIN["main.py<br/>装配 · 异常处理器 · 静态托管 · /api/health"]
+    IMG["routers/image.py<br/>图片检测路由"]
+    VID["routers/video.py<br/>视频任务与 MJPEG 路由"]
+    VAL["validators.py<br/>文件校验与解码"]
+    DET["detector.py<br/>Detector 单例"]
+    STAT["stats.py<br/>统计与风险"]
+    TASK["tasks.py<br/>TaskRegistry · Task"]
+  end
+
+  CFG["config.py<br/>常量与类别映射"]
+  MODEL[("YOLO 权重<br/>models/yolov8n.pt")]
+
+  JS -->|HTTP 上传| IMG
+  JS -->|HTTP 上传 / 轮询 / 停止| VID
+  JS -->|MJPEG 拉流| VID
+
+  IMG --> VAL
+  VID --> VAL
+  IMG --> DET
+  VID --> TASK
+  TASK --> STAT
+  IMG --> STAT
+  VID --> DET
+
+  MAIN -.挂载.-> IMG
+  MAIN -.挂载.-> VID
+  MAIN -.启动加载.-> DET
+  MAIN -.启动初始化.-> TASK
+  MAIN -.读取.-> CFG
+  VAL -.读取白名单与上限.-> CFG
+  DET -.读取阈值与路径.-> CFG
+  STAT -.读取类别映射.-> CFG
+  DET -->|predict| MODEL
+```
+
+组件职责见第 4 节目录结构；接口清单如下：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/detect/image` | 图片检测，返回标注图与单帧统计 |
+| POST | `/api/detect/video` | 创建视频任务，返回 `task_id` |
+| GET | `/api/detect/video/status/{task_id}` | 轮询任务状态与累计统计 |
+| POST | `/api/detect/video/stop/{task_id}` | 请求停止任务 |
+| GET | `/api/detect/video/stream/{task_id}` | MJPEG 视频流 |
+| GET | `/api/health` | 模型就绪状态与类别名 |
+
+### 5.2 图片检测数据流
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as 浏览器 app.js
+  participant I as routers/image.py
+  participant V as validators.py
+  participant D as detector.py
+  participant T as stats.py
+
+  U->>I: POST /api/detect/image（multipart 文件）
+  I->>V: validate_image(文件名, MIME, 字节)
+  Note over V: 扩展名 → MIME → 大小 → cv2 解码探测
+  V-->>I: 通过 或 ValidationError(400/413)
+  I->>V: decode_image(字节)
+  V-->>I: BGR ndarray
+  I->>D: infer(frame)
+  Note over D: model.predict(conf=0.25) → boxes → detections
+  D-->>I: 标注帧, detections[], elapsed_ms
+  I->>T: compute_single(detections)
+  T-->>I: {counts, risk}
+  I-->>U: {image(base64), detections, stats, elapsed_ms, detected_at}
+```
+
+文字流：
+
 ```
 上传图片 → validators 校验（扩展名/MIME/大小/可解码）
-        → detector.infer → 标注图（JPEG base64 或文件 URL）+ detections[]
-        → stats.compute(单帧) → 风险等级
-        → 返回 {image, detections, stats, risk, elapsed_ms}
+        → detector.infer → 标注图（JPEG base64）+ detections[]
+        → stats.compute_single → 风险等级
+        → 返回 {image, detections, stats, elapsed_ms, detected_at}
 ```
 
-### 5.2 视频检测
+### 5.3 视频检测数据流
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as 浏览器 app.js
+  participant Vt as routers/video.py
+  participant W as 后台线程 _process_video
+  participant Tk as tasks.Task / TaskRegistry
+  participant Cf as cv2.VideoCapture
+  participant D as detector.py
+
+  U->>Vt: POST /api/detect/video（multipart 文件）
+  Vt->>Vt: validate_video（临时文件探测后删除）
+  Vt->>Tk: create("video") → task_id
+  Vt->>Vt: save_video_temp 落盘
+  Vt->>W: 启动线程并立即返回
+  Vt-->>U: {task_id}
+
+  par 后台推理
+    W->>Tk: status = running
+    loop 每帧
+      W->>Cf: read()
+      Cf-->>W: frame 或 EOF
+      W->>D: infer(frame)
+      D-->>W: 标注帧, detections
+      W->>Tk: stats.accumulate(detections)
+      W->>Tk: set_frame(jpeg)
+    end
+    W->>Tk: status = done / stopped / error
+    W->>W: 释放 cap、删除临时文件
+  and 前端拉流
+    U->>Vt: GET /stream/{task_id}（MJPEG）
+    loop 每 30ms
+      Vt->>Tk: 读 latest_jpeg（加锁）
+      Vt-->>U: multipart 帧
+    end
+    Note over Vt: 任务进入终态后结束响应
+  and 前端轮询
+    U->>Vt: GET /status/{task_id}（每 600ms）
+    Vt->>Tk: status_payload()
+    Vt-->>U: {status, status_text, stats, error}
+  end
+
+  U->>Vt: POST /stop/{task_id}（可选）
+  Vt->>Tk: request_stop() → stop_event.set()
+  Tk-->>W: 下一轮循环退出 → status = stopped
 ```
-上传视频 → validators 校验 → tasks.create(task_id, running)
+
+文字流：
+
+```
+上传视频 → validators 校验 → tasks.create(task_id, pending→running)
         → 独立线程：逐帧读取 → detector.infer → 标注帧 JPEG
-                  → 写入该任务的帧队列（供 MJPEG 消费）
+                  → 写入该任务的 latest_jpeg（供 MJPEG 消费）
                   → stats.accumulate(逐帧)
                   → 检测到停止信号 / 读到 EOF / 出错 → 置 stopped|done|error
 前端 GET /api/detect/video/stream/{task_id} → StreamingResponse(MJPEG)
 前端 GET /api/detect/video/status/{task_id} → 轮询状态与统计
 前端 POST /api/detect/video/stop/{task_id}  → 触发停止
 ```
+
+### 5.4 模型调用链
+
+```mermaid
+graph LR
+  A["frame_bgr<br/>ndarray"] --> B["Detector.infer<br/>app/detector.py:33"]
+  B --> C["model.predict<br/>conf=0.25, verbose=False"]
+  C --> D["result.boxes<br/>cls / conf / xyxy"]
+  D --> E["detections[]<br/>label · category · confidence · bbox"]
+  C --> F["result.plot()<br/>标注帧"]
+  B --> G["elapsed_ms"]
+```
+
+- 加载：`Detector.load()`（`app/detector.py:18`）→ `YOLO(path)`，读取 `model.names` 存入 `class_names`；失败时 `ready=False`，`load_error` 为固定中文提示（不泄露服务器路径）。
+- 类别归一：`stats.category_of()`（`app/stats.py:4`）把 `model.names` 的标签映射为 `fire / smoke / other`，映射表在 `app/config.py` 的 `FIRE_LABELS`、`SMOKE_LABELS`。
 
 ## 6. 任务状态机
 
@@ -140,6 +287,27 @@ pending → running → done        （正常处理到文件结束）
 - 模型加载在应用启动时执行；失败时不崩溃，记录状态，相关接口返回 503 与可理解提示（满足能力要求 5）。
 
 ## 9. 安全设计（SEC-DESIGN 自检）
+
+### 9.1 信任边界与敏感标注图
+
+```mermaid
+graph LR
+  subgraph UZ["不可信边界（外部输入）"]
+    F1["图片上传"]
+    F2["视频上传"]
+  end
+  subgraph TZ["内部信任域"]
+    V["validators<br/>唯一校验入口"]
+    P["推理 / 统计 / 任务表"]
+  end
+  F1 -->|"校验：类型·大小·可解码"| V
+  F2 -->|"校验：类型·大小·可播放"| V
+  V -->|"已净化"| P
+  P -->|"L1 结果：bbox·类别·置信度"| OUT["响应 / 页面"]
+  V -. "L2 媒体，仅本地只读，不外发" .-> P
+```
+
+### 9.2 设计要点
 
 - **信任边界（DESIGN-1）**：所有上传文件（图片/视频）来自外部，属**不可信边界**，入口在 `validators` 统一校验；任务流/推理/统计为内部信任域。
 - **数据流敏感标注（DESIGN-2）**：上传媒体为 L2（内部，不对外转发）；检测结果（bbox/类别/置信度）为 L1（可展示）；无 L3/L4 数据（无凭据、无个人信息）。不上传第三方。
