@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config
 from .detector import Detector, ModelNotLoadedError
-from .routers import image, video
+from .routers import camera, image, video
 from .tasks import TaskRegistry
 from .validators import ValidationError
 
@@ -53,4 +53,5 @@ async def index():
 
 app.include_router(image.router)
 app.include_router(video.router)
+app.include_router(camera.router)
 app.mount("/static", StaticFiles(directory=str(config.STATIC_DIR)), name="static")
