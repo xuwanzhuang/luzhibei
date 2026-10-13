@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>火点/烟雾目标检测</title>
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<header>
+  <h1>火点 / 烟雾目标检测</h1>
+  <p class="disclaimer">结果仅用于辅助识别，不替代人工复核与应急决策。</p>
+</header>
+
+<nav class="tabs">
+  <button id="tab-image" class="tab active" data-mode="image">图片检测</button>
+  <button id="tab-video" class="tab" data-mode="video">视频检测</button>
+</nav>
+
+<main>
+  <section id="panel-image" class="panel">
+    <input type="file" id="image-input" accept=".jpg,.jpeg,.png" />
+    <button id="image-start">开始检测</button>
+  </section>
+
+  <section id="panel-video" class="panel hidden">
+    <input type="file" id="video-input" accept=".mp4,.avi,.mov" />
+    <button id="video-start">开始检测</button>
+    <button id="video-stop" disabled>停止</button>
+    <span id="video-status" class="badge">未开始</span>
+  </section>
+
+  <div id="message" class="message hidden"></div>
+
+  <div class="result">
+    <div class="viewer">
+      <img id="preview" alt="检测结果预览" />
+    </div>
+    <aside class="side">
+      <div id="risk" class="risk normal">风险等级：正常</div>
+      <div id="summary" class="summary"></div>
+      <h3>检测明细</h3>
+      <table id="detections">
+        <thead><tr><th>类别</th><th>置信度</th><th>位置</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </aside>
+  </div>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
