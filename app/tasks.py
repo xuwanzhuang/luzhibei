@@ -67,6 +67,13 @@ class TaskRegistry:
         with self._lock:
             return self._tasks.get(task_id)
 
+    def active_of(self, kind: str):
+        with self._lock:
+            for task in self._tasks.values():
+                if task.kind == kind and task.status not in TERMINAL:
+                    return task
+        return None
+
     def remove(self, task_id: str):
         with self._lock:
             self._tasks.pop(task_id, None)
