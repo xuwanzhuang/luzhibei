@@ -15,6 +15,7 @@
 <nav class="tabs">
   <button id="tab-image" class="tab active" data-mode="image">图片检测</button>
   <button id="tab-video" class="tab" data-mode="video">视频检测</button>
+  <button id="tab-camera" class="tab" data-mode="camera">摄像头检测</button>
 </nav>
 
 <main>
@@ -28,6 +29,14 @@
     <button id="video-start">开始检测</button>
     <button id="video-stop" disabled>停止</button>
     <span id="video-status" class="badge">未开始</span>
+  </section>
+
+  <section id="panel-camera" class="panel hidden">
+    <label for="camera-device">设备号</label>
+    <input type="number" id="camera-device" value="0" min="0" max="9" style="width:80px" />
+    <button id="camera-start">开启摄像头</button>
+    <button id="camera-stop" disabled>关闭摄像头</button>
+    <span id="camera-status" class="badge">未开启</span>
   </section>
 
   <div id="message" class="message hidden"></div>
