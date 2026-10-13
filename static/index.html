@@ -3,59 +3,113 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>火点/烟雾目标检测</title>
+<title>火点 / 烟雾 智能监测大屏</title>
 <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-<header>
-  <h1>火点 / 烟雾目标检测</h1>
-  <p class="disclaimer">结果仅用于辅助识别，不替代人工复核与应急决策。</p>
-</header>
-
-<nav class="tabs">
-  <button id="tab-image" class="tab active" data-mode="image">图片检测</button>
-  <button id="tab-video" class="tab" data-mode="video">视频检测</button>
-  <button id="tab-camera" class="tab" data-mode="camera">摄像头检测</button>
-</nav>
-
-<main>
-  <section id="panel-image" class="panel">
-    <input type="file" id="image-input" accept=".jpg,.jpeg,.png" />
-    <button id="image-start">开始检测</button>
-  </section>
-
-  <section id="panel-video" class="panel hidden">
-    <input type="file" id="video-input" accept=".mp4,.avi,.mov" />
-    <button id="video-start">开始检测</button>
-    <button id="video-stop" disabled>停止</button>
-    <span id="video-status" class="badge">未开始</span>
-  </section>
-
-  <section id="panel-camera" class="panel hidden">
-    <label for="camera-device">设备号</label>
-    <input type="number" id="camera-device" value="0" min="0" max="9" style="width:80px" />
-    <button id="camera-start">开启摄像头</button>
-    <button id="camera-stop" disabled>关闭摄像头</button>
-    <span id="camera-status" class="badge">未开启</span>
-  </section>
-
-  <div id="message" class="message hidden"></div>
-
-  <div class="result">
-    <div class="viewer">
-      <img id="preview" alt="检测结果预览" />
+<div class="screen">
+  <header class="topbar panel">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <h1>火点 / 烟雾 智能监测大屏</h1>
     </div>
-    <aside class="side">
-      <div id="risk" class="risk normal">风险等级：正常</div>
-      <div id="summary" class="summary"></div>
-      <h3>检测明细</h3>
-      <table id="detections">
-        <thead><tr><th>类别</th><th>置信度</th><th>位置</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </aside>
-  </div>
-</main>
+    <div class="top-info">
+      <span class="chip" id="mode-chip">图片检测</span>
+      <span class="clock" id="clock">--:--:--</span>
+      <span class="lamp ok" id="lamp"><i></i><b id="lamp-text">系统正常</b></span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="col">
+      <div class="panel">
+        <div class="panel-title">实时指标</div>
+        <div class="kpi">
+          <span class="kpi-label">目标总数</span>
+          <span class="kpi-value" id="kpi-total">0</span>
+        </div>
+        <div class="kpi danger">
+          <span class="kpi-label">火点</span>
+          <span class="kpi-value" id="kpi-fire">0</span>
+        </div>
+        <div class="kpi warn">
+          <span class="kpi-label">烟雾</span>
+          <span class="kpi-value" id="kpi-smoke">0</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">风险等级</span>
+          <span class="kpi-value" id="kpi-risk">正常</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">运行信息</div>
+        <div class="meta-row"><span>已处理帧</span><b id="meta-frames">0</b></div>
+        <div class="meta-row"><span>累计目标</span><b id="meta-total">0</b></div>
+        <div class="meta-row"><span>耗时</span><b id="meta-elapsed">-</b></div>
+        <div class="meta-row"><span>更新时间</span><b id="meta-time">-</b></div>
+      </div>
+    </section>
+
+    <section class="col center">
+      <div class="panel viewer-panel">
+        <div class="panel-title">实时画面</div>
+        <div class="viewer">
+          <img id="preview" alt="检测结果预览" class="hidden" />
+          <div id="placeholder" class="placeholder">请选择图片并点击「开始检测」</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="col">
+      <div class="panel">
+        <div class="panel-title">类别计数</div>
+        <div id="labels" class="labels">
+          <div class="empty">暂无检测数据</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">目标数量趋势</div>
+        <canvas id="trend" width="320" height="120"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <section class="panel console">
+    <nav class="tabs">
+      <button id="tab-image" class="tab active" data-mode="image">图片检测</button>
+      <button id="tab-video" class="tab" data-mode="video">视频检测</button>
+      <button id="tab-camera" class="tab" data-mode="camera">摄像头检测</button>
+    </nav>
+    <div class="console-body">
+      <section id="panel-image" class="panel-inner">
+        <input type="file" id="image-input" accept=".jpg,.jpeg,.png" />
+        <button id="image-start">开始检测</button>
+      </section>
+      <section id="panel-video" class="panel-inner hidden">
+        <input type="file" id="video-input" accept=".mp4,.avi,.mov" />
+        <button id="video-start">开始检测</button>
+        <button id="video-stop" disabled>停止</button>
+        <span id="video-status" class="badge">未开始</span>
+      </section>
+      <section id="panel-camera" class="panel-inner hidden">
+        <label for="camera-device">设备号</label>
+        <input type="number" id="camera-device" value="0" min="0" max="9" />
+        <button id="camera-start">开启摄像头</button>
+        <button id="camera-stop" disabled>关闭摄像头</button>
+        <span id="camera-status" class="badge">未开启</span>
+      </section>
+      <button id="sound-toggle" class="ghost">提示音：关闭</button>
+    </div>
+    <div id="message" class="message hidden"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">告警记录</div>
+    <div id="alert-log" class="alert-log">
+      <div class="alert-empty">暂无告警</div>
+    </div>
+  </section>
+</div>
 
 <script src="/static/app.js"></script>
 </body>

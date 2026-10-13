@@ -20,3 +20,10 @@
 - 启动：`& "D:\miniconda\envs\aigc\python.exe" -m uvicorn app.main:app --port 8000`
 - 测试：`& "D:\miniconda\envs\aigc\python.exe" -m pytest -q`
 - 占位权重 `models/yolov8n.pt`（COCO 80 类，不含 fire/smoke）；真实权重到位后改 `app/config.py` 的 `MODEL_PATH` 并复验 `FIRE_LABELS`/`SMOKE_LABELS`。
+
+## UI 实现参考
+
+前端按全局「监控大屏风格」规范实现（规范细节见 `ui-monitoring-dashboard.md`，本项目的实现示例）：
+
+- `static/index.html`、`static/style.css`、`static/app.js`
+- 设计说明：`docs/superpowers/specs/2026-10-13-monitoring-dashboard-redesign.md`

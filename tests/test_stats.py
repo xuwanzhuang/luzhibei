@@ -39,3 +39,51 @@ def test_task_stats_accumulate_and_peak():
     assert snap["peak"]["fire"] == 2
     assert snap["total"]["smoke"] == 1
     assert snap["risk"] == "high"
+
+
+def test_by_label_counts_real_categories():
+    res = stats.compute_single([_d("fire"), _d("person"), _d("person"), _d("car")])
+    assert res["by_label"]["person"] == 2
+    assert res["by_label"]["car"] == 1
+    assert res["by_label"]["fire"] == 1
+
+
+def test_alerts_fire_is_alarm_and_risk_high():
+    res = stats.compute_single([_d("fire")])
+    assert res["alerts"] == [{"label": "fire", "level": "alarm"}]
+    assert res["risk"] == "high"
+
+
+def test_alerts_smoke_only_is_warn_and_risk_medium():
+    res = stats.compute_single([_d("smoke")])
+    assert res["alerts"] == [{"label": "smoke", "level": "warn"}]
+    assert res["risk"] == "medium"
+
+
+def test_alerts_ignore_labels_without_rules():
+    res = stats.compute_single([_d("person"), _d("car")])
+    assert res["alerts"] == []
+    assert res["risk"] == "normal"
+
+
+def test_task_stats_tracks_by_label_and_peak():
+    ts = stats.TaskStats()
+    ts.accumulate([_d("person"), _d("person")])
+    ts.accumulate([_d("person"), _d("smoke")])
+    snap = ts.snapshot()
+    assert snap["by_label"]["person"] == 3
+    assert snap["peak"]["person"] == 2
+    assert snap["peak"]["total"] == 2
+    assert snap["alerts"] == [{"label": "smoke", "level": "warn"}]
+    assert snap["risk"] == "medium"
+
+
+def test_task_stats_current_is_latest_frame():
+    ts = stats.TaskStats()
+    ts.accumulate([_d("person"), _d("person")])
+    ts.accumulate([_d("smoke")])
+    snap = ts.snapshot()
+    assert snap["current"]["counts"]["total"] == 1
+    assert snap["current"]["by_label"] == {"smoke": 1}
+    assert snap["current"]["alerts"] == [{"label": "smoke", "level": "warn"}]
+    assert snap["by_label"]["person"] == 2

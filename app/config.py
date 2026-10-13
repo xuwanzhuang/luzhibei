@@ -33,3 +33,21 @@ RISK_TEXT = {
     RISK_MEDIUM: "检测到烟雾，请关注现场情况",
     RISK_HIGH: "检测到火点，请立即人工复核",
 }
+
+ALERT_ALARM = "alarm"
+ALERT_WARN = "warn"
+ALERT_NORMAL = "normal"
+
+ALERT_RULES = {
+    "fire": ALERT_ALARM,
+    "flame": ALERT_ALARM,
+    "火点": ALERT_ALARM,
+    "火焰": ALERT_ALARM,
+    "smoke": ALERT_WARN,
+    "烟雾": ALERT_WARN,
+}
+
+ALERT_TEXT = {
+    ALERT_ALARM: "报警",
+    ALERT_WARN: "预警",
+}
