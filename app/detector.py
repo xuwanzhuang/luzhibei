@@ -21,10 +21,10 @@ class Detector:
             self.model = YOLO(path)
             self.class_names = dict(getattr(self.model, "names", {}) or {})
             self.load_error = None
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             self.model = None
             self.class_names = {}
-            self.load_error = f"检测模型加载失败：{exc}"
+            self.load_error = "检测模型加载失败，请确认模型权重已正确放置"
 
     @property
     def ready(self) -> bool:
