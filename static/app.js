@@ -17,7 +17,9 @@ function switchMode(next) {
   );
   $("panel-image").classList.toggle("hidden", next !== "image");
   $("panel-video").classList.toggle("hidden", next !== "video");
+  $("panel-camera").classList.toggle("hidden", next !== "camera");
   if (next !== "video") stopVideoTask();
+  if (next !== "camera") stopCameraTask();
   $("preview").src = "";
   resetStats();
   showMessage("");
@@ -130,9 +132,46 @@ async function pollStatus(id) {
     if (["done", "stopped", "error"].includes(s.status)) {
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       $("video-stop").disabled = true;
+      $("camera-stop").disabled = true;
+      $("camera-start").disabled = false;
       if (id === currentTaskId) currentTaskId = null;
     }
   } catch (e) {}
+}
+
+$("camera-start").onclick = async () => {
+  const device = ($("camera-device").value || "0").trim();
+  showMessage("");
+  stopCameraTask();
+  try {
+    const resp = await fetch(
+      `/api/detect/camera/start?device=${encodeURIComponent(device)}`,
+      { method: "POST" }
+    );
+    if (!resp.ok) { showMessage(await parseError(resp)); return; }
+    const data = await resp.json();
+    currentTaskId = data.task_id;
+    $("preview").src = `/api/detect/camera/stream/${currentTaskId}`;
+    $("camera-stop").disabled = false;
+    $("camera-start").disabled = true;
+    $("camera-status").textContent = "检测中";
+    pollTimer = setInterval(() => pollStatus(currentTaskId), 600);
+  } catch (e) {
+    showMessage("网络异常，请重试");
+  }
+};
+
+$("camera-stop").onclick = () => stopCameraTask();
+
+async function stopCameraTask() {
+  if (!currentTaskId) return;
+  const id = currentTaskId;
+  currentTaskId = null;
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  $("camera-stop").disabled = true;
+  $("camera-start").disabled = false;
+  $("camera-status").textContent = "已关闭";
+  try { await fetch(`/api/detect/camera/stop/${id}`, { method: "POST" }); } catch (e) {}
 }
 
 document.querySelectorAll(".tab").forEach((t) => {
