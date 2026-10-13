@@ -21,7 +21,8 @@
 - 不做用户注册登录、多用户/多租户。
 - 不做云端存储、数据库持久化（任务状态仅内存态，随进程结束销毁）。
 - 不做模型训练、精度调优、数据标注。
-- 不做真实视频流（RTSP/摄像头）接入。
+- 不做真实视频流（RTSP）接入。
+- 摄像头实时检测已作为后续能力实现，见 `2026-10-13-camera-detection-design.md`。
 
 ## 2. 能力要求映射
 
@@ -59,7 +60,8 @@ luzhibei/
 │  └─ routers/
 │     ├─ __init__.py
 │     ├─ image.py       # POST /api/detect/image
-│     └─ video.py       # POST /api/detect/video, GET /stream/{id}, POST /stop/{id}, GET /status/{id}
+│     ├─ video.py       # POST /api/detect/video, GET /stream/{id}, POST /stop/{id}, GET /status/{id}
+│     └─ camera.py      # POST /api/detect/camera/start, GET /status/{id}, POST /stop/{id}, GET /stream/{id}
 ├─ static/
 │  ├─ index.html
 │  ├─ app.js
